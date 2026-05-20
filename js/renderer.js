@@ -659,7 +659,9 @@ fn main_render(
 export class WGSLRenderer {
   constructor() {
     this.device = null;
-    this.canvas = null;
+    this.gpuCanvas = null;
+    this.displayCanvas = null;
+    this.displayCtx = null;
     this.context = null;
     this.htmlBuffer = null;
     this.domBuffer = null;
@@ -669,16 +671,12 @@ export class WGSLRenderer {
     this.parsePipeline = null;
     this.renderPipeline = null;
     this.bindGroup = null;
-    this.offscreenCanvas = null;
-    this.offscreenCtx = null;
   }
 
-  async init(canvas) {
-    this.canvas = canvas;
-
-    // Create offscreen 2D canvas for rendering
-    this.offscreenCanvas = new OffscreenCanvas(800, 600);
-    this.offscreenCtx = this.offscreenCanvas.getContext('2d');
+  async init(gpuCanvas, displayCanvas) {
+    this.gpuCanvas = gpuCanvas;
+    this.displayCanvas = displayCanvas;
+    this.displayCtx = displayCanvas.getContext('2d');
 
     if (!navigator.gpu) {
       throw new Error('WebGPU not supported');
@@ -690,7 +688,7 @@ export class WGSLRenderer {
     }
 
     this.device = await adapter.requestDevice();
-    this.context = canvas.getContext('webgpu');
+    this.context = this.gpuCanvas.getContext('webgpu');
     const format = navigator.gpu.getPreferredCanvasFormat();
     this.context.configure({
       device: this.device,
@@ -834,18 +832,14 @@ export class WGSLRenderer {
     await this.readPixelBuffer.mapAsync(GPUMapMode.READ);
     const pixels = new Float32Array(this.readPixelBuffer.getMappedRange());
 
-    const imgData = this.offscreenCtx.createImageData(800, 600);
+    const imgData = this.displayCtx.createImageData(800, 600);
     for (let i = 0; i < 800 * 600; i++) {
       imgData.data[i * 4] = Math.floor(pixels[i * 4] * 255);
       imgData.data[i * 4 + 1] = Math.floor(pixels[i * 4 + 1] * 255);
       imgData.data[i * 4 + 2] = Math.floor(pixels[i * 4 + 2] * 255);
       imgData.data[i * 4 + 3] = 255;
     }
-    this.offscreenCtx.putImageData(imgData, 0, 0);
-
-    // Copy offscreen canvas to main canvas
-    const ctx = this.canvas.getContext('2d');
-    ctx.drawImage(this.offscreenCanvas, 0, 0);
+    this.displayCtx.putImageData(imgData, 0, 0);
 
     this.readPixelBuffer.unmap();
   }
