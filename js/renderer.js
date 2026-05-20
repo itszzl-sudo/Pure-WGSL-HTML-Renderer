@@ -832,6 +832,10 @@ export class WGSLRenderer {
     await this.readPixelBuffer.mapAsync(GPUMapMode.READ);
     const pixels = new Float32Array(this.readPixelBuffer.getMappedRange());
 
+    // Debug: check first few pixels
+    console.log('First pixels:', pixels[0], pixels[1], pixels[2], pixels[3]);
+    console.log('Pixel at (400,300):', pixels[(300 * 800 + 400) * 4], pixels[(300 * 800 + 400) * 4 + 1], pixels[(300 * 800 + 400) * 4 + 2]);
+
     const imgData = this.displayCtx.createImageData(800, 600);
     for (let i = 0; i < 800 * 600; i++) {
       imgData.data[i * 4] = Math.floor(pixels[i * 4] * 255);
