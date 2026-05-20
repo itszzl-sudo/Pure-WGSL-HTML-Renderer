@@ -159,11 +159,10 @@ fn create_dom_node(
   node.style = init_style();
 
   if (parent_idx_val < 512u) {
-    var parent_node = &(*dom_tree).nodes[parent_idx_val];
-    if ((*parent_node).first_child == 512u) {
-      (*parent_node).first_child = idx;
+    if ((*dom_tree).nodes[parent_idx_val].first_child == 512u) {
+      (*dom_tree).nodes[parent_idx_val].first_child = idx;
     } else {
-      var sibling_idx = (*parent_node).first_child;
+      var sibling_idx = (*dom_tree).nodes[parent_idx_val].first_child;
       while ((*dom_tree).nodes[sibling_idx].next_sibling != 512u) {
         sibling_idx = (*dom_tree).nodes[sibling_idx].next_sibling;
       }
@@ -224,13 +223,11 @@ fn parse_tag_attributes(
     }
 
     if (attr_name_end > attr_name_start) {
-      var node = &(*dom_tree).nodes[node_idx];
-      var attr = &(*node).attrs[attr_count];
-      (*attr).name_off = attr_name_start;
-      (*attr).name_len = attr_name_end - attr_name_start;
-      (*attr).val_off = attr_val_start;
-      (*attr).val_len = attr_val_end - attr_val_start;
-      (*node).attr_count += 1u;
+      (*dom_tree).nodes[node_idx].attrs[attr_count].name_off = attr_name_start;
+      (*dom_tree).nodes[node_idx].attrs[attr_count].name_len = attr_name_end - attr_name_start;
+      (*dom_tree).nodes[node_idx].attrs[attr_count].val_off = attr_val_start;
+      (*dom_tree).nodes[node_idx].attrs[attr_count].val_len = attr_val_end - attr_val_start;
+      (*dom_tree).nodes[node_idx].attr_count += 1u;
       attr_count += 1u;
     }
   }
@@ -274,13 +271,12 @@ fn parse_html(
         let is_blank = is_blank_text(html_source, text_start, html_ptr);
         if (!is_blank) {
           let text_idx = create_dom_node(dom_tree, 1u, node_stack[stack_ptr - 1u]);
-          var text_node = &(*dom_tree).nodes[text_idx];
-          (*text_node).tag_name_off = text_start;
-          (*text_node).tag_name_len = html_ptr - text_start;
-          (*text_node).style.is_text_node = 1u;
+          (*dom_tree).nodes[text_idx].tag_name_off = text_start;
+          (*dom_tree).nodes[text_idx].tag_name_len = html_ptr - text_start;
+          (*dom_tree).nodes[text_idx].style.is_text_node = 1u;
           let size = text_content_tokenize(html_source, text_start, html_ptr);
-          (*text_node).style.content_w = size.x;
-          (*text_node).style.content_h = size.y;
+          (*dom_tree).nodes[text_idx].style.content_w = size.x;
+          (*dom_tree).nodes[text_idx].style.content_h = size.y;
         }
         text_start = 512u;
       }
@@ -324,14 +320,13 @@ fn parse_html(
         let node_type = select(0u, 2u, is_img);
         let new_idx = create_dom_node(dom_tree, node_type, node_stack[stack_ptr - 1u]);
 
-        var new_node = &(*dom_tree).nodes[new_idx];
-        (*new_node).tag_name_off = tag_real_start;
-        (*new_node).tag_name_len = tag_len;
+        (*dom_tree).nodes[new_idx].tag_name_off = tag_real_start;
+        (*dom_tree).nodes[new_idx].tag_name_len = tag_len;
 
         if (is_img) {
-          (*new_node).style.is_img_node = 1u;
-          (*new_node).style.width = 100.0;
-          (*new_node).style.height = 100.0;
+          (*dom_tree).nodes[new_idx].style.is_img_node = 1u;
+          (*dom_tree).nodes[new_idx].style.width = 100.0;
+          (*dom_tree).nodes[new_idx].style.height = 100.0;
         }
 
         parse_tag_attributes(html_source, tag_name_end, select(tag_end, tag_end - 1u, is_self_close), dom_tree, new_idx);
@@ -364,7 +359,8 @@ fn apply_style_property(
   source: ptr<storage, array<u32>, read_write>,
   key_s: u32, key_e: u32,
   val_s: u32, val_e: u32,
-  style: ptr<function, InlineStyle>
+  node_idx: u32,
+  dom_tree: ptr<storage, DomRootTree, read_write>
 ) {
   let key_len = key_e - key_s;
 
@@ -376,11 +372,11 @@ fn apply_style_property(
     let c4 = (*source)[key_s + 4u];
 
     if (c0 == 119u && c1 == 105u && c2 == 100u && c3 == 116u && c4 == 104u) {
-      (*style).width = parse_css_px(source, val_s, val_e);
+      (*dom_tree).nodes[node_idx].style.width = parse_css_px(source, val_s, val_e);
     } else if (c0 == 104u && c1 == 101u && c2 == 105u && c3 == 103u && c4 == 104u) {
-      (*style).height = parse_css_px(source, val_s, val_e);
+      (*dom_tree).nodes[node_idx].style.height = parse_css_px(source, val_s, val_e);
     } else if (c0 == 99u && c1 == 111u && c2 == 108u && c3 == 111u && c4 == 114u) {
-      (*style).text_color = css_color_to_rgba(source, val_s, val_e);
+      (*dom_tree).nodes[node_idx].style.text_color = css_color_to_rgba(source, val_s, val_e);
     }
   }
 
@@ -396,7 +392,7 @@ fn apply_style_property(
     let c8 = (*source)[key_s + 8u];
 
     if (c0 == 102u && c1 == 111u && c2 == 110u && c3 == 116u && c4 == 45u && c5 == 115u && c6 == 105u && c7 == 122u && c8 == 101u) {
-      (*style).font_size = parse_css_px(source, val_s, val_e);
+      (*dom_tree).nodes[node_idx].style.font_size = parse_css_px(source, val_s, val_e);
     }
   }
 
@@ -420,7 +416,7 @@ fn apply_style_property(
     if (key_len == 16u) {
       let c15 = (*source)[key_s + 15u];
       if (c0 == 98u && c1 == 97u && c2 == 99u && c3 == 107u && c4 == 103u && c5 == 114u && c6 == 111u && c7 == 117u && c8 == 110u && c9 == 100u && c10 == 45u && c11 == 99u && c12 == 111u && c13 == 108u && c14 == 111u && c15 == 114u) {
-        (*style).bg_color = css_color_to_rgba(source, val_s, val_e);
+        (*dom_tree).nodes[node_idx].style.bg_color = css_color_to_rgba(source, val_s, val_e);
       }
     }
   }
@@ -441,7 +437,7 @@ fn apply_style_property(
     let c12 = (*source)[key_s + 12u];
 
     if (c0 == 98u && c1 == 111u && c2 == 114u && c3 == 100u && c4 == 101u && c5 == 114u && c6 == 45u && c7 == 114u && c8 == 97u && c9 == 100u && c10 == 105u && c11 == 117u && c12 == 115u) {
-      (*style).border_radius = parse_css_px(source, val_s, val_e);
+      (*dom_tree).nodes[node_idx].style.border_radius = parse_css_px(source, val_s, val_e);
     }
   }
 }
@@ -450,7 +446,8 @@ fn parse_style_string(
   source: ptr<storage, array<u32>, read_write>,
   s: u32,
   e: u32,
-  style: ptr<function, InlineStyle>
+  node_idx: u32,
+  dom_tree: ptr<storage, DomRootTree, read_write>
 ) {
   var ptr = s;
   while (ptr < e) {
@@ -466,7 +463,7 @@ fn parse_style_string(
     if (ptr < e && (*source)[ptr] == 59u) { ptr += 1u; }
 
     if (key_end > key_start && val_end > val_start) {
-      apply_style_property(source, key_start, key_end, val_start, val_end, style);
+      apply_style_property(source, key_start, key_end, val_start, val_end, node_idx, dom_tree);
     }
   }
 }
@@ -476,20 +473,20 @@ fn parse_inline_css(
   dom_tree: ptr<storage, DomRootTree, read_write>,
   node_idx: u32
 ) {
-  var node = &(*dom_tree).nodes[node_idx];
-  var style = &(*node).style;
-
-  for (var a: u32 = 0u; a < (*node).attr_count; a++) {
-    var attr = &(*node).attrs[a];
-    let is_style = (*attr).name_len == 5u;
+  for (var a: u32 = 0u; a < (*dom_tree).nodes[node_idx].attr_count; a++) {
+    let attr_len = (*dom_tree).nodes[node_idx].attrs[a].name_len;
+    let is_style = attr_len == 5u;
     if (is_style) {
-      let match1 = (*source)[(*attr).name_off] == 115u;
-      let match2 = (*source)[(*attr).name_off + 1u] == 116u;
-      let match3 = (*source)[(*attr).name_off + 2u] == 121u;
-      let match4 = (*source)[(*attr).name_off + 3u] == 108u;
-      let match5 = (*source)[(*attr).name_off + 4u] == 101u;
+      let name_off = (*dom_tree).nodes[node_idx].attrs[a].name_off;
+      let match1 = (*source)[name_off] == 115u;
+      let match2 = (*source)[name_off + 1u] == 116u;
+      let match3 = (*source)[name_off + 2u] == 121u;
+      let match4 = (*source)[name_off + 3u] == 108u;
+      let match5 = (*source)[name_off + 4u] == 101u;
       if (match1 && match2 && match3 && match4 && match5) {
-        parse_style_string(source, (*attr).val_off, (*attr).val_off + (*attr).val_len, style);
+        let val_off = (*dom_tree).nodes[node_idx].attrs[a].val_off;
+        let val_len = (*dom_tree).nodes[node_idx].attrs[a].val_len;
+        parse_style_string(source, val_off, val_off + val_len, node_idx, dom_tree);
       }
     }
   }
@@ -507,63 +504,59 @@ fn parse_all_css(
 fn layout_iterative(
   dom_tree: ptr<storage, DomRootTree, read_write>
 ) {
-  var root = &(*dom_tree).nodes[(*dom_tree).root_node_id];
-  (*root).style.layout_x = 10.0;
-  (*root).style.layout_y = 10.0;
-  (*root).style.content_w = CANVAS_W - 20.0;
-  (*root).style.content_h = CANVAS_H - 20.0;
+  let root_id = (*dom_tree).root_node_id;
+  (*dom_tree).nodes[root_id].style.layout_x = 10.0;
+  (*dom_tree).nodes[root_id].style.layout_y = 10.0;
+  (*dom_tree).nodes[root_id].style.content_w = CANVAS_W - 20.0;
+  (*dom_tree).nodes[root_id].style.content_h = CANVAS_H - 20.0;
 
   var stack: array<u32, 64>;
   var stack_size: u32 = 0u;
 
-  stack[0] = (*dom_tree).root_node_id;
+  stack[0] = root_id;
   stack_size = 1u;
 
   while (stack_size > 0u) {
     stack_size = stack_size - 1u;
     var parent_idx = stack[stack_size];
 
-    var parent = &(*dom_tree).nodes[parent_idx];
+    var current_x = (*dom_tree).nodes[parent_idx].style.layout_x + (*dom_tree).nodes[parent_idx].style.padding_left;
+    var current_y = (*dom_tree).nodes[parent_idx].style.layout_y + (*dom_tree).nodes[parent_idx].style.padding_top;
 
-    var current_x = (*parent).style.layout_x + (*parent).style.padding_left;
-    var current_y = (*parent).style.layout_y + (*parent).style.padding_top;
-
-    var child_idx = (*parent).first_child;
+    var child_idx = (*dom_tree).nodes[parent_idx].first_child;
     while (child_idx != 512u && child_idx < (*dom_tree).total_node) {
-      var child = &(*dom_tree).nodes[child_idx];
-
-      if ((*child).style.is_text_node != 0u) {
-        if ((*child).style.content_w <= 0.0 || (*child).style.content_h <= 0.0) {
-          (*child).style.skip_render = 1u;
+      if ((*dom_tree).nodes[child_idx].style.is_text_node != 0u) {
+        if ((*dom_tree).nodes[child_idx].style.content_w <= 0.0 || (*dom_tree).nodes[child_idx].style.content_h <= 0.0) {
+          (*dom_tree).nodes[child_idx].style.skip_render = 1u;
         }
       }
 
-      if ((*child).style.skip_render == 0u) {
-        var child_w = select((*child).style.content_w, (*child).style.width, (*child).style.width > 0.0);
-        var child_h = select((*child).style.content_h, (*child).style.height, (*child).style.height > 0.0);
+      if ((*dom_tree).nodes[child_idx].style.skip_render == 0u) {
+        var child_w = select((*dom_tree).nodes[child_idx].style.content_w, (*dom_tree).nodes[child_idx].style.width, (*dom_tree).nodes[child_idx].style.width > 0.0);
+        var child_h = select((*dom_tree).nodes[child_idx].style.content_h, (*dom_tree).nodes[child_idx].style.height, (*dom_tree).nodes[child_idx].style.height > 0.0);
 
         if (child_w <= 0.0) { child_w = 100.0; }
         if (child_h <= 0.0) { child_h = 20.0; }
 
-        (*child).style.content_w = child_w;
-        (*child).style.content_h = child_h;
+        (*dom_tree).nodes[child_idx].style.content_w = child_w;
+        (*dom_tree).nodes[child_idx].style.content_h = child_h;
 
-        (*child).style.layout_x = current_x + (*child).style.margin_left;
-        (*child).style.layout_y = current_y + (*child).style.margin_top;
+        (*dom_tree).nodes[child_idx].style.layout_x = current_x + (*dom_tree).nodes[child_idx].style.margin_left;
+        (*dom_tree).nodes[child_idx].style.layout_y = current_y + (*dom_tree).nodes[child_idx].style.margin_top;
 
-        if ((*child).style.is_block != 0u) {
-          current_y += child_h + (*child).style.margin_top + 8.0;
+        if ((*dom_tree).nodes[child_idx].style.is_block != 0u) {
+          current_y += child_h + (*dom_tree).nodes[child_idx].style.margin_top + 8.0;
         } else {
-          current_x += child_w + (*child).style.margin_left + 4.0;
+          current_x += child_w + (*dom_tree).nodes[child_idx].style.margin_left + 4.0;
         }
       }
 
-      if ((*child).first_child != 512u && stack_size < 64u) {
+      if ((*dom_tree).nodes[child_idx].first_child != 512u && stack_size < 64u) {
         stack[stack_size] = child_idx;
         stack_size = stack_size + 1u;
       }
 
-      child_idx = (*child).next_sibling;
+      child_idx = (*dom_tree).nodes[child_idx].next_sibling;
     }
   }
 }
@@ -587,46 +580,45 @@ fn render_pixel(
   var color = vec4<f32>(0.95, 0.95, 0.95, 1.0);
 
   for (var i: u32 = 0u; i < (*dom_tree).total_node; i++) {
-    var node = &(*dom_tree).nodes[i];
-    if ((*node).style.skip_render != 0u) { continue; }
+    if ((*dom_tree).nodes[i].style.skip_render != 0u) { continue; }
 
-    let nx = (*node).style.layout_x;
-    let ny = (*node).style.layout_y;
-    let nw = (*node).style.content_w;
-    let nh = (*node).style.content_h;
+    let nx = (*dom_tree).nodes[i].style.layout_x;
+    let ny = (*dom_tree).nodes[i].style.layout_y;
+    let nw = (*dom_tree).nodes[i].style.content_w;
+    let nh = (*dom_tree).nodes[i].style.content_h;
 
     if (x >= nx && x <= nx + nw && y >= ny && y <= ny + nh) {
-      if ((*node).style.bg_color.a > 0.0) {
-        color = mix(color, (*node).style.bg_color, (*node).style.bg_color.a);
+      if ((*dom_tree).nodes[i].style.bg_color.a > 0.0) {
+        color = mix(color, (*dom_tree).nodes[i].style.bg_color, (*dom_tree).nodes[i].style.bg_color.a);
       }
 
-      if ((*node).style.border_size > 0.0) {
-        let border = (*node).style.border_size;
+      if ((*dom_tree).nodes[i].style.border_size > 0.0) {
+        let border = (*dom_tree).nodes[i].style.border_size;
         if (x < nx + border || x > nx + nw - border ||
             y < ny + border || y > ny + nh - border) {
-          if ((*node).style.border_color.a > 0.0) {
-            color = mix(color, (*node).style.border_color, (*node).style.border_color.a);
+          if ((*dom_tree).nodes[i].style.border_color.a > 0.0) {
+            color = mix(color, (*dom_tree).nodes[i].style.border_color, (*dom_tree).nodes[i].style.border_color.a);
           }
         }
       }
 
-      if ((*node).style.is_text_node != 0u) {
+      if ((*dom_tree).nodes[i].style.is_text_node != 0u) {
         let in_bounds = x >= nx + 2.0 && x <= nx + nw - 2.0 &&
                         y >= ny + 2.0 && y <= ny + nh - 2.0;
         if (in_bounds) {
           let char_idx = u32((x - nx - 2.0) / CHAR_WIDTH);
-          let text_off = (*node).tag_name_off;
-          let text_len = (*node).tag_name_len;
+          let text_off = (*dom_tree).nodes[i].tag_name_off;
+          let text_len = (*dom_tree).nodes[i].tag_name_len;
           if (char_idx < text_len) {
             let line_y = u32((y - ny - 2.0) / LINE_HEIGHT);
             if (line_y < 2u) {
-              color = mix(color, (*node).style.text_color, 0.9);
+              color = mix(color, (*dom_tree).nodes[i].style.text_color, 0.9);
             }
           }
         }
       }
 
-      if ((*node).style.is_img_node != 0u) {
+      if ((*dom_tree).nodes[i].style.is_img_node != 0u) {
         let cx = nx + nw / 2.0;
         let cy = ny + nh / 2.0;
         let dx = x - cx;
