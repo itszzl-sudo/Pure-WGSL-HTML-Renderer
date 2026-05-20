@@ -665,13 +665,20 @@ export class WGSLRenderer {
     this.domBuffer = null;
     this.pixelBuffer = null;
     this.readPixelBuffer = null;
+    this.pipeline = null;
     this.parsePipeline = null;
     this.renderPipeline = null;
     this.bindGroup = null;
+    this.offscreenCanvas = null;
+    this.offscreenCtx = null;
   }
 
   async init(canvas) {
     this.canvas = canvas;
+
+    // Create offscreen 2D canvas for rendering
+    this.offscreenCanvas = new OffscreenCanvas(800, 600);
+    this.offscreenCtx = this.offscreenCanvas.getContext('2d');
 
     if (!navigator.gpu) {
       throw new Error('WebGPU not supported');
@@ -827,15 +834,18 @@ export class WGSLRenderer {
     await this.readPixelBuffer.mapAsync(GPUMapMode.READ);
     const pixels = new Float32Array(this.readPixelBuffer.getMappedRange());
 
-    const ctx = this.canvas.getContext('2d');
-    const imgData = ctx.createImageData(800, 600);
+    const imgData = this.offscreenCtx.createImageData(800, 600);
     for (let i = 0; i < 800 * 600; i++) {
       imgData.data[i * 4] = Math.floor(pixels[i * 4] * 255);
       imgData.data[i * 4 + 1] = Math.floor(pixels[i * 4 + 1] * 255);
       imgData.data[i * 4 + 2] = Math.floor(pixels[i * 4 + 2] * 255);
       imgData.data[i * 4 + 3] = 255;
     }
-    ctx.putImageData(imgData, 0, 0);
+    this.offscreenCtx.putImageData(imgData, 0, 0);
+
+    // Copy offscreen canvas to main canvas
+    const ctx = this.canvas.getContext('2d');
+    ctx.drawImage(this.offscreenCanvas, 0, 0);
 
     this.readPixelBuffer.unmap();
   }
