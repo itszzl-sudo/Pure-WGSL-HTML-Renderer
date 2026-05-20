@@ -33,10 +33,10 @@ struct InlineStyle {
   border_radius: f32,
   font_size: f32,
   text_color: vec4<f32>,
-  is_block: bool,
-  skip_render: bool,
-  is_text_node: bool,
-  is_img_node: bool
+  is_block: u32,
+  skip_render: u32,
+  is_text_node: u32,
+  is_img_node: u32
 }
 
 struct DomNode {
@@ -133,10 +133,10 @@ fn init_style() -> InlineStyle {
   s.border_radius = 0.0;
   s.font_size = FONT_SIZE_DEFAULT;
   s.text_color = vec4<f32>(0.0, 0.0, 0.0, 1.0);
-  s.is_block = true;
-  s.skip_render = false;
-  s.is_text_node = false;
-  s.is_img_node = false;
+  s.is_block = 1u;
+  s.skip_render = 0u;
+  s.is_text_node = 0u;
+  s.is_img_node = 0u;
   return s;
 }
 
@@ -277,7 +277,7 @@ fn parse_html(
           var text_node = &(*dom_tree).nodes[text_idx];
           (*text_node).tag_name_off = text_start;
           (*text_node).tag_name_len = html_ptr - text_start;
-          (*text_node).style.is_text_node = true;
+          (*text_node).style.is_text_node = 1u;
           let size = text_content_tokenize(html_source, text_start, html_ptr);
           (*text_node).style.content_w = size.x;
           (*text_node).style.content_h = size.y;
@@ -329,7 +329,7 @@ fn parse_html(
         (*new_node).tag_name_len = tag_len;
 
         if (is_img) {
-          (*new_node).style.is_img_node = true;
+          (*new_node).style.is_img_node = 1u;
           (*new_node).style.width = 100.0;
           (*new_node).style.height = 100.0;
         }
@@ -532,13 +532,13 @@ fn layout_iterative(
     while (child_idx != 512u && child_idx < (*dom_tree).total_node) {
       var child = &(*dom_tree).nodes[child_idx];
 
-      if ((*child).style.is_text_node) {
+      if ((*child).style.is_text_node != 0u) {
         if ((*child).style.content_w <= 0.0 || (*child).style.content_h <= 0.0) {
-          (*child).style.skip_render = true;
+          (*child).style.skip_render = 1u;
         }
       }
 
-      if (!(*child).style.skip_render) {
+      if ((*child).style.skip_render == 0u) {
         var child_w = select((*child).style.content_w, (*child).style.width, (*child).style.width > 0.0);
         var child_h = select((*child).style.content_h, (*child).style.height, (*child).style.height > 0.0);
 
@@ -551,7 +551,7 @@ fn layout_iterative(
         (*child).style.layout_x = current_x + (*child).style.margin_left;
         (*child).style.layout_y = current_y + (*child).style.margin_top;
 
-        if ((*child).style.is_block) {
+        if ((*child).style.is_block != 0u) {
           current_y += child_h + (*child).style.margin_top + 8.0;
         } else {
           current_x += child_w + (*child).style.margin_left + 4.0;
@@ -588,7 +588,7 @@ fn render_pixel(
 
   for (var i: u32 = 0u; i < (*dom_tree).total_node; i++) {
     var node = &(*dom_tree).nodes[i];
-    if ((*node).style.skip_render) { continue; }
+    if ((*node).style.skip_render != 0u) { continue; }
 
     let nx = (*node).style.layout_x;
     let ny = (*node).style.layout_y;
@@ -610,7 +610,7 @@ fn render_pixel(
         }
       }
 
-      if ((*node).style.is_text_node) {
+      if ((*node).style.is_text_node != 0u) {
         let in_bounds = x >= nx + 2.0 && x <= nx + nw - 2.0 &&
                         y >= ny + 2.0 && y <= ny + nh - 2.0;
         if (in_bounds) {
@@ -626,7 +626,7 @@ fn render_pixel(
         }
       }
 
-      if ((*node).style.is_img_node) {
+      if ((*node).style.is_img_node != 0u) {
         let cx = nx + nw / 2.0;
         let cy = ny + nh / 2.0;
         let dx = x - cx;
