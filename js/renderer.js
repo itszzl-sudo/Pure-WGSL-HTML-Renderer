@@ -700,7 +700,8 @@ export class WGSLRenderer {
       usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST
     });
 
-    const domNodeSize = (4 + 4 + 4 + 4 + 4 + 16 * (4 * 4) + 4 + (4 * 10 + 4 * 4 + 1)) * 512 + 8;
+    // DomNode = 416 bytes, 512 nodes = 212992 bytes + 16 bytes header = ~213008
+    const domNodeSize = 213008;
     this.domBuffer = this.device.createBuffer({
       size: domNodeSize,
       usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC | GPUBufferUsage.COPY_DST
